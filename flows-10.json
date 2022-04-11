@@ -1,0 +1,404 @@
+[
+    {
+        "id": "5b05595a.9f493",
+        "type": "tab",
+        "label": "RS485 Example",
+        "disabled": true,
+        "info": ""
+    },
+    {
+        "id": "dfb9274.26febd8",
+        "type": "inject",
+        "z": "5b05595a.9f493",
+        "name": "Start the Process",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "10",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "10",
+        "topic": "",
+        "payloadType": "date",
+        "x": 450,
+        "y": 460,
+        "wires": [
+            [
+                "ca5c8923.12c448"
+            ]
+        ]
+    },
+    {
+        "id": "ca5c8923.12c448",
+        "type": "function",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "func": "msg.payload = {};\nmsg.payload.address = \"00:13:a2:00:41:d3:54:2d\";\nmsg.payload.data = [0x06, 0x06, 0x11, 0x00, 0x00, 0x01, 0x4C, 0x81];\nflow.set(\"request_type\",\"start_process\");\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 630,
+        "y": 460,
+        "wires": [
+            [
+                "36c662f854bdafc0"
+            ]
+        ]
+    },
+    {
+        "id": "9306b959.04883",
+        "type": "inject",
+        "z": "5b05595a.9f493",
+        "name": "Read DO and Temp",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "10",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "15",
+        "topic": "",
+        "payloadType": "date",
+        "x": 440,
+        "y": 540,
+        "wires": [
+            [
+                "d2e4922a.c81b58"
+            ]
+        ]
+    },
+    {
+        "id": "d2e4922a.c81b58",
+        "type": "function",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "func": "msg.payload = {};\nmsg.payload.address = \"00:13:a2:00:41:d3:54:2d\";\nmsg.payload.data = [0x06, 0x03, 0x00, 0x00, 0x00, 0x04, 0x45, 0xBE];\nflow.set(\"request_type\",\"read_do_and_temp\");\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 630,
+        "y": 540,
+        "wires": [
+            [
+                "36c662f854bdafc0"
+            ]
+        ]
+    },
+    {
+        "id": "2f6d809f.251d4",
+        "type": "function",
+        "z": "5b05595a.9f493",
+        "name": "Update Reading Variables",
+        "func": "byteArray = msg.payload.data;\nnode.log(\"update readings\");\n\nexpectedLength = 13;\n\nif(byteArray.length < 13){\n    flow.set(\"system_status\",\"Read DO and Temp Failed\");\n}else{\n    flow.set(\"system_status\",\"All Clear\");\n    //Disolved Oxygen\n    dOx = (byteArray[3]*256)+byteArray[4];\n    decimalPlacesDO = (byteArray[5]*256)+byteArray[6];\n    dOx /= Math.pow(10, decimalPlacesDO);\n    \n    flow.set(\"disolved_oxygen\",dOx);\n    \n    //Temperature\n    temp = (byteArray[7]*256)+byteArray[8];\n    decimalPlacesTemp = (byteArray[9]*256)+byteArray[10];\n    temp /= Math.pow(10, decimalPlacesTemp);\n    \n    flow.set(\"temperature\",temp);\n    newMSG = {};\n    newMSG.payload = {};\n    newMSG.payload.ubidotsDeviceLabel = msg.payload.addr;\n    newMSG.payload.temperature = temp;\n    newMSG.payload.disolved_oxygen = dOx;\n    msg = newMSG;\n}\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1470,
+        "y": 640,
+        "wires": [
+            [
+                "ce7f954b.81d208",
+                "9c24bbf.670a5c8",
+                "e65426e0.73ba58",
+                "60d642c8.74e0ac"
+            ]
+        ]
+    },
+    {
+        "id": "e6600abb.359ad",
+        "type": "switch",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "property": "request_type",
+        "propertyType": "flow",
+        "rules": [
+            {
+                "t": "eq",
+                "v": "start_process",
+                "vt": "str"
+            },
+            {
+                "t": "eq",
+                "v": "read_do_and_temp",
+                "vt": "str"
+            }
+        ],
+        "checkall": "true",
+        "repair": false,
+        "outputs": 2,
+        "x": 1250,
+        "y": 600,
+        "wires": [
+            [
+                "f3d03ece.4cbb88"
+            ],
+            [
+                "2f6d809f.251d4",
+                "8d1b9159.093fc"
+            ]
+        ]
+    },
+    {
+        "id": "f3d03ece.4cbb88",
+        "type": "function",
+        "z": "5b05595a.9f493",
+        "name": "eval_start_process_response",
+        "func": "dataBytes = msg.payload.data;\nnode.log(\"eval_start_process\");\n\npass = true;\n\ngoodResponse = [0x06, 0x06, 0x11, 0x00, 0x00, 0x01, 0x4C, 0x81];\n\nfor(i = 0; i < goodResponse; i++){\n    if(goodResponse[i] != dataBytes[i]){\n        pass = false;\n        break;\n    }\n}\n\nif(pass){\n    flow.set(\"system_status\",\"All Clear\");\n}else{\n    flow.set(\"system_status\",\"Start Process Failed\");\n}\n\nreturn msg;",
+        "outputs": 1,
+        "noerr": 0,
+        "x": 1580,
+        "y": 540,
+        "wires": [
+            [
+                "8792686.78f5598"
+            ]
+        ]
+    },
+    {
+        "id": "60d642c8.74e0ac",
+        "type": "debug",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 1730,
+        "y": 840,
+        "wires": []
+    },
+    {
+        "id": "8d1b9159.093fc",
+        "type": "debug",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "active": false,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "x": 1490,
+        "y": 600,
+        "wires": []
+    },
+    {
+        "id": "f7d26441.f57fb",
+        "type": "ui_text",
+        "z": "5b05595a.9f493",
+        "group": "9a99ee59.78111",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "System Status: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "x": 1960,
+        "y": 640,
+        "wires": []
+    },
+    {
+        "id": "ce7f954b.81d208",
+        "type": "change",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "system_status",
+                "tot": "flow"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1740,
+        "y": 640,
+        "wires": [
+            [
+                "f7d26441.f57fb"
+            ]
+        ]
+    },
+    {
+        "id": "2c865c6d.260814",
+        "type": "ui_text",
+        "z": "5b05595a.9f493",
+        "group": "9a99ee59.78111",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Disolved Oxygen: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "x": 1970,
+        "y": 680,
+        "wires": []
+    },
+    {
+        "id": "9c24bbf.670a5c8",
+        "type": "change",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "disolved_oxygen",
+                "tot": "flow"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1740,
+        "y": 680,
+        "wires": [
+            [
+                "2c865c6d.260814"
+            ]
+        ]
+    },
+    {
+        "id": "eb99ef1b.f7f148",
+        "type": "ui_text",
+        "z": "5b05595a.9f493",
+        "group": "9a99ee59.78111",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "Temperature: ",
+        "format": "{{msg.payload}}C",
+        "layout": "row-spread",
+        "x": 1950,
+        "y": 720,
+        "wires": []
+    },
+    {
+        "id": "e65426e0.73ba58",
+        "type": "change",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "temperature",
+                "tot": "flow"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1740,
+        "y": 720,
+        "wires": [
+            [
+                "eb99ef1b.f7f148"
+            ]
+        ]
+    },
+    {
+        "id": "2fe6c254.1acf1e",
+        "type": "ui_text",
+        "z": "5b05595a.9f493",
+        "group": "9a99ee59.78111",
+        "order": 0,
+        "width": 0,
+        "height": 0,
+        "name": "",
+        "label": "System Status: ",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "x": 2080,
+        "y": 540,
+        "wires": []
+    },
+    {
+        "id": "8792686.78f5598",
+        "type": "change",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "rules": [
+            {
+                "t": "set",
+                "p": "payload",
+                "pt": "msg",
+                "to": "system_status",
+                "tot": "flow"
+            }
+        ],
+        "action": "",
+        "property": "",
+        "from": "",
+        "to": "",
+        "reg": false,
+        "x": 1860,
+        "y": 540,
+        "wires": [
+            [
+                "2fe6c254.1acf1e"
+            ]
+        ]
+    },
+    {
+        "id": "36c662f854bdafc0",
+        "type": "ncd-gateway-node",
+        "z": "5b05595a.9f493",
+        "name": "",
+        "connection": "",
+        "unknown_devices": 0,
+        "outputs": 1,
+        "x": 870,
+        "y": 500,
+        "wires": [
+            [
+                "e6600abb.359ad"
+            ]
+        ]
+    },
+    {
+        "id": "9a99ee59.78111",
+        "type": "ui_group",
+        "name": "Default",
+        "tab": "baba0f0a.d97b",
+        "order": 1,
+        "disp": true,
+        "width": "6",
+        "collapse": false
+    },
+    {
+        "id": "baba0f0a.d97b",
+        "type": "ui_tab",
+        "name": "Home",
+        "icon": "dashboard",
+        "order": 6,
+        "disabled": false,
+        "hidden": false
+    }
+]
